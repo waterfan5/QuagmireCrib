@@ -1,0 +1,705 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+   <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+   <link rel="icon" href="..\shared\favicon.ico" />
+   <title>Quagmire Crib Analyzer</title>
+   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+   <link rel="stylesheet" href="../shared/hamburgermenu.css" />
+   <script type="text/javascript" src="../shared/hamburgermenu.js"></script>
+   <script async src="https://www.googletagmanager.com/gtag/js?id=G-1T547128ND"></script>
+
+   <script>
+      const ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+      function completeAlphabet(string) {
+         /**
+          * Replace '?' in the input string with missing letters of the alphabet so that all letters are present.
+          *
+          * @param {string} string - A string of 26 unique characters that may include '?'.
+          * @returns {string} A string where all '?' are replaced with missing letters, and all 26 letters are present.
+          * @throws {Error} If the input string is not exactly 26 characters long.
+          */
+
+         if (string.length !== 26) {
+            throw new Error("Input string must be exactly 26 characters long.");
+         }
+
+         const alphabet = new Set("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+         const presentLetters = new Set(string.replace(/\?/g, ''));
+         const missingLetters = Array.from(alphabet).filter(letter => !presentLetters.has(letter)).sort();
+
+         // Replace '?' with missing letters
+         let result = string.split('');
+         let missingIndex = 0;
+         for (let i = 0; i < result.length; i++) {
+            if (result[i] === '?') {
+               result[i] = missingLetters[missingIndex];
+               missingIndex++;
+            }
+         }
+
+         return result.join('');
+      }
+
+      function decodeText(ciphertext, alphabetStr, fullAlphabet, keyLength, crib) {
+         let decodedText = "";
+         let keyIndex = 0;
+         let cribIdx = 0;
+         let otp1 = "";
+         let otp2 = "";
+
+         for (let i = 0; i < ciphertext.length; i++) {
+            let char = ciphertext[i];
+            if (/[a-zA-Z]/.test(char)) {
+               if (cribIdx < crib.length) {
+                  cribchar = crib[cribIdx];
+                  cribIdx += 1;
+                  while (cribIdx < crib.length && /[^a-zA-Z?]/.test(cribchar)) { // Crib left?
+                     decodedText += cribchar; //Copy cripchar
+                     cribchar = crib[cribIdx];
+                     cribIdx += 1;
+
+                  }
+               } else {
+                  cribchar = "";
+               }
+               const sublist = fullAlphabet.slice(keyIndex * 26, keyIndex * 26 + 26);
+               const upperChar = char.toUpperCase();
+               if (sublist.includes(upperChar)) {
+                  let alphabet = alphabetStr.slice(keyIndex * 26, keyIndex * 26 + 26);
+                  const chrIdx = sublist.indexOf(upperChar);
+                  let chrIdx2 = -1;
+                  if (/[a-zA-Z]/.test(cribchar)) {
+                     char = cribchar;
+
+                  }
+                  const decodedChar = alphabet[chrIdx];
+                  if (/[a-zA-Z]/.test(decodedChar)) {
+                     if (sublist.includes(decodedChar)) {
+                        chrIdx2 = sublist.indexOf(decodedChar);
+                     }
+                  }
+                  decodedText += char === char.toUpperCase()
+                     ? decodedChar
+                     : decodedChar.toLowerCase();
+
+                  if (chrIdx2 != -1) {
+                     otp1 += char === char.toUpperCase()
+                        ? sublist[(chrIdx - chrIdx2 + 26) % 26]
+                        : sublist[(chrIdx - chrIdx2 + 26) % 26].toLowerCase();
+                     otp2 += char === char.toUpperCase()
+                        ? alphabet[(chrIdx - chrIdx2 + 26) % 26]
+                        : alphabet[(chrIdx - chrIdx2 + 26) % 26].toLowerCase();
+                  } else {
+                     otp1 += "?";
+                     otp2 += "?";
+                  }
+
+               } else {
+                  decodedText += "?";
+               }
+               keyIndex = (keyIndex + 1) % keyLength;
+            } else {
+               if (cribIdx >= crib.length) { // Crib left?
+                  decodedText += char; // Use cipher char
+               } else {
+                  cribchar = crib[cribIdx]
+                  if (/[a-zA-Z]/.test(cribchar)) {
+                     //                   decodedText += char; // Use the non-letter cipher char
+                  }
+                  else {
+                     cribIdx += 1;
+                     decodedText += cribchar; // Prefer the cribchar
+                  }
+               }
+            }
+         }
+
+         return decodedText;
+      }
+
+      function findAlphabet0(fullAlphabet, keyLength, alphabetIdx, fullKeyIdx, n) {
+         let newAlphabetIdx = [...alphabetIdx];
+         let newFullKeyIdx = [...fullKeyIdx];
+         while (n < fullAlphabet.length) {
+            let cipherLetter = fullAlphabet[n];
+            if (cipherLetter != "?") {
+               keyIdx = Math.floor(n / 26);
+               if (newFullKeyIdx[keyIdx] == -1) {
+                  for (let i = 0; i < 26; i++) { //Try every key
+                     newFullKeyIdx[keyIdx] = i;
+                     outcome = findAlphabet0(fullAlphabet, keyLength, newAlphabetIdx, newFullKeyIdx, n);
+                     if (outcome != false) {
+                        return (outcome);
+                     }
+                  }
+                  // Nothing wasy found
+                  return (false);
+               } else {
+                  letterIdx = n % 26;
+                  if (newAlphabetIdx[letterIdx] == -1) {
+                     for (let i = 0; i < 26; i++) { //Try every key
+                        if (!newAlphabetIdx.includes(i)) { // Find an unused value
+                           newAlphabetIdx[letterIdx] = i;
+                           outcome = findAlphabet0(fullAlphabet, keyLength, newAlphabetIdx, newFullKeyIdx, n);
+                           if (outcome != false) {
+                              return (outcome);
+                           }
+                        }
+                     }
+                     // Nothing wasy found
+                     return (false);
+                  } else {
+                     cipherLetterIdx = cipherLetter.charCodeAt(0) - 'A'.charCodeAt(0);
+                     cipherKeyValue = (newFullKeyIdx[keyIdx] + newAlphabetIdx[letterIdx]) % 26;
+                     if (newAlphabetIdx[cipherLetterIdx] == -1) {
+                        if (!newAlphabetIdx.includes(cipherKeyValue)) { // Test if unused value
+                           newAlphabetIdx[cipherLetterIdx] = cipherKeyValue;
+                        } else
+                           return (false); // We already have this value
+                     }
+                     else {
+                        if (newAlphabetIdx[cipherLetterIdx] != cipherKeyValue) {
+                           return (false); // Mismatch
+                        }
+                     }
+                  }
+               }
+            }
+            n += 1;
+         }
+         return { newAlphabetIdx, newFullKeyIdx }
+      }
+
+      function findAlphabet(fullAlphabet, keyLength) {
+         const alphabetIdx = Array(26).fill(-1);
+         const keyIdx = Array(keyLength).fill(-1);
+
+         return (findAlphabet0(fullAlphabet, keyLength, alphabetIdx, keyIdx, 0));
+      }
+
+      function processCrib(ciphertext, alphabetStr, crib, keyLength, cbCipherType) {
+         const fullAlphabet = Array(keyLength * 26).fill("?");
+
+         let cleancrib = crib.replace(/[^a-zA-Z\?]/g, '');
+         let cleanciphertext = ciphertext.replace(/[^a-zA-Z]/g, '');
+         const alphabet = alphabetStr;
+         let keyIndex = 0;
+
+         for (let i = 0; i < cleancrib.length; i++) {
+
+            if (cleancrib[i] != "?") {
+
+               if (cbCipherType == "vig") {
+                  const char = cleancrib[i];
+                  const chrIdx = alphabet.indexOf(char.toUpperCase());
+                  const fullAlphabetIdx = keyIndex * 26 + chrIdx;
+                  if (fullAlphabet[fullAlphabetIdx] == "?") {
+                     for (let j = 0; j < 26; j++) {
+                        fullAlphabet[keyIndex * 26 + j] = ALPHA[(26 - chrIdx + j + alphabet.indexOf(cleanciphertext[i].toUpperCase())) % 26];
+                     }
+                  } else if (fullAlphabet[fullAlphabetIdx] !== cleanciphertext[i].toUpperCase()) {
+                     return { errorpos: i, fullAlphabet }; // Inconsistent mapping
+                  }
+               }
+               if (cbCipherType == "qm1" || cbCipherType == "qm3") {
+                  const char = cleanciphertext[i];
+                  const chrIdx = alphabet.indexOf(char.toUpperCase());
+                  const fullAlphabetIdx = keyIndex * 26 + chrIdx;
+                  if (fullAlphabet[fullAlphabetIdx] == "?") {
+                     fullAlphabet[fullAlphabetIdx] = cleancrib[i].toUpperCase();
+                  } else if (fullAlphabet[fullAlphabetIdx] !== cleancrib[i].toUpperCase()) {
+                     return { errorpos: i, fullAlphabet }; // Inconsistent mapping
+                  }
+               }
+               if (cbCipherType == "qm2") {
+                  const char = cleancrib[i];
+                  const chrIdx = alphabet.indexOf(char.toUpperCase());
+                  const fullAlphabetIdx = keyIndex * 26 + chrIdx;
+
+                  if (fullAlphabet[fullAlphabetIdx] == "?") {
+                     fullAlphabet[fullAlphabetIdx] = cleanciphertext[i].toUpperCase();
+                  } else if (fullAlphabet[fullAlphabetIdx] !== cleanciphertext[i].toUpperCase()) {
+                     return { errorpos: i, fullAlphabet }; // Inconsistent mapping
+                  }
+               }
+            }
+            keyIndex = (keyIndex + 1) % keyLength;
+         }
+
+         return { errorpos: -1, fullAlphabet };
+      }
+
+      function GenKeywordFromCrib(alphabet, keyword) {
+         newkeyword = Array(keyword.length).fill(-1);
+         for (let k = 0; k < keyword.length; k++) {
+            if (keyword[k] != "?") {
+               if (alphabet.includes(keyword[k])) {
+                  newkeyword[k] = alphabet.indexOf(keyword[k]);
+               }
+            }
+         }
+         return (newkeyword);
+      }
+
+      function createQuadmireIIIKey(cribkey, cribalphabet, ciphertext, crib, keylength) {
+         cribkey = cribkey.toUpperCase();
+         cribalphabet = cribalphabet.toUpperCase();
+         let keyword = (cribkey + "?".repeat(keylength)).slice(0, keylength).split("");
+         let alphabet = (cribalphabet + "?".repeat(26)).slice(0, 26).split("");
+         keyword = GenKeywordFromCrib(alphabet, keyword);
+         let keyidx = 0;
+         let cribidx = 0;
+         ciphertext = ciphertext.toUpperCase();
+         crib = crib.toUpperCase();
+         crib = crib.replace(/[^a-zA-Z\?]/g, '');
+         ciphertext = ciphertext.replace(/[^a-zA-Z]/g, '');
+         //       ciphertext = "QGXWUBYYUZKBPRAYAFHYYGWIBBEDLLNTMWVTTFQVSSSFDTHNMRBYUXXKFVSSYPZLGNMCSDBJYVEETRVSXTFCPRRYCFBKRPRRIBJGYBWQUVRWWHGWURDFNDZCDZQZDBDVXEVPPACBHJMYGSLZWYXGSONDKGLVQBPWUJGXGWTQRGSVYRPDBFBUDGUJRJMVGTCFJYFDUKGFYNBEMVGGQCASFDMGWYKONYYBFBWYJRUWUFGNGIBZWUFLYKETPNAZBVXMYRNDFWCOPUUHLXJZDPNOYFAMXIIYSDKNTECMTORVWHZLEDMJXADFKEQRNBXQIALTZWYKXYVPSLSUOPGJJVESKMWFLERQFXDPGJEKUIVMWRJMTAGRHGYGIOQSUZDFGEGRVXEDFGATAYBAHXCINODKFHZGMVGWDZNEYRUHWRWGCBBQVVKGWHOJZUDBWQGXWUBYYUZKBPRAYAFHYYGWIBBEDLLNTMWVTTFQVSSSFDTHNMRBYUXXKFVSSYPZLGNMCSDBJYVEETRVSXTFCPRRYCFBKRPRRIBJGYBWQUVRWWHGWURDFNDZCDZQZDBDVXEVPPACBHJMYGSLZWYX"
+         //       crib = "CONGRATULATIONSTHEGEOCACHEYOUARELOOKINGFORISHIDDENATNORTHFORTYTWODEGREESSIXTEENPOINTONETWENTYONEWESTEIGHTNINEDEGREESFORTYFOURPOINTSIXHUNDREDFIFTEENCONGRATULATIONSTHEGEOCACHEYOUARELOOKINGFORISHIDDENATNORTHFORTYTWODEGREESSIXTEENPOINTONETWENTYONEWESTEIGHTNINEDEGREESFORTYFOURPOINTSIXHUNDREDFIFTEENCONGRATULATIONSTHEGEOCACHEYOUARELOOKINGFORISHIDDENATNORTHFORTYTWODEGREESSIXTEENPOINTONETWENTYONEWESTEIGHTNINEDEGREESFORTYFOURPOINTSIXHUNDREDFIFTEENCONGRATULATIONSTHEGEOCACHEYOUARELOOKINGFORISHIDDENATNORTHFORTYTWODEGREESSIXTEENPOINTONETWENTYONEWESTEIGHTNINEDEGREESFORTYFOURPOINTSIXHUNDREDFIFTEEN"
+         //       alphabet = "CIPHERSABDFGJKLMNOQTUVWXYZ".split("");
+         let result = createQuadmireIIIKey0(ciphertext, crib, keylength, alphabet, keyword, keyidx, cribidx);
+
+         result[1] = result[1].join("");
+         result[1] = completeAlphabet(result[1]); // Assuming you have a completeAlphabet function defined in JavaScript
+         let k = "";
+         for (let idx = 0; idx < result[2].length; idx++)
+            k += result[1][result[2][idx]];
+         result[2] = k;
+         return result;
+      }
+
+      function createQuadmireIIIKey0(ciphertext, crib, keylength, alphabet, keyword, keyidx, cribidx) {
+         while (keyidx < keylength) {
+            while (cribidx < crib.length) {
+               let char = crib[cribidx];
+               if (char != "?") {
+                  if (alphabet.includes(char)) {
+                     let charidx = alphabet.indexOf(char);
+                     if (keyword[keyidx] !== -1) {
+                        let ciphercharidx = (charidx + keyword[keyidx]) % 26;
+                        if (alphabet[ciphercharidx] === "?" && !alphabet.includes(ciphertext[cribidx])) {
+                           let newAlphabet = [...alphabet];
+                           newAlphabet[ciphercharidx] = ciphertext[cribidx];
+                           return createQuadmireIIIKey0(ciphertext, crib, keylength, newAlphabet, keyword, keyidx, cribidx + keylength);
+                        } else if (alphabet[ciphercharidx] === ciphertext[cribidx]) {
+                           return createQuadmireIIIKey0(ciphertext, crib, keylength, alphabet, keyword, keyidx, cribidx + keylength);
+                        } else {
+                           return [cribidx, alphabet, keyword];;
+                        }
+                     } else {
+                        let cipherchar = ciphertext[cribidx];
+                        if (alphabet.includes(cipherchar)) {
+                           let ciphercharidx = alphabet.indexOf(cipherchar);
+                           let newKeyword = [...keyword];
+                           newKeyword[keyidx] = (26 + ciphercharidx - charidx) % 26;
+                           return createQuadmireIIIKey0(ciphertext, crib, keylength, alphabet, newKeyword, keyidx, cribidx + keylength);
+                        } else {
+                           for (let i = 0; i < 26; i++) {
+                              if (alphabet[i] === "?") {
+                                 let newAlphabet = [...alphabet];
+                                 newAlphabet[i] = cipherchar;
+                                 let result = createQuadmireIIIKey0(ciphertext, crib, keylength, newAlphabet, keyword, keyidx, cribidx);
+                                 if (result[0] == -1) return result;
+                              }
+                           }
+                           return [cribidx, alphabet, keyword];;
+                        }
+                     }
+                  } else {
+                     for (let i = 0; i < 26; i++) {
+                        if (alphabet[i] === "?") {
+                           let newAlphabet = [...alphabet];
+                           newAlphabet[i] = char;
+                           let cipherchar = ciphertext[cribidx];
+                           if (newAlphabet.includes(cipherchar)) {
+                              let ciphercharidx = alphabet.indexOf(cipherchar);
+                              let keyoffset = (26 + ciphercharidx - i) % 26;
+                              if (keyword[keyidx] === -1) {
+                                 let newKeyword = [...keyword];
+                                 newKeyword[keyidx] = keyoffset;
+                                 let result = createQuadmireIIIKey0(ciphertext, crib, keylength, newAlphabet, newKeyword, keyidx, cribidx);
+                                 if (result[0] == -1) return result;
+                              } else if (keyword[keyidx] === keyoffset) {
+                                 let result = createQuadmireIIIKey0(ciphertext, crib, keylength, newAlphabet, keyword, keyidx, cribidx + keylength);
+                                 if (result[0] == -1) return result;
+                              }
+                           } else {
+                              let result = createQuadmireIIIKey0(ciphertext, crib, keylength, newAlphabet, keyword, keyidx, cribidx);
+                              if (result[0] == -1) return result;
+                           }
+                        }
+                     }
+                     return [cribidx, alphabet, keyword];
+                  }
+               }
+               cribidx += keylength;
+            }
+            keyidx++;
+            cribidx = keyidx;
+         }
+         return [-1, alphabet, keyword];
+      }
+
+      function isShiftedRotationWithWildcard(A, B) {
+         if (A.length !== B.length) {
+            return null; // Strings must be of the same length
+         }
+
+         const n = A.length;
+
+         // Combine A and B while replacing '?' in A with the corresponding characters from B
+         const combineStrings = (A, B) => {
+            return Array.from({ length: n }, (_, i) => A[i] === '?' ? B[i] : A[i]).join('');
+         };
+
+         // Check for shifted rotations
+         for (let shift = 0; shift < n; shift++) {
+            const rotatedB = B.slice(shift) + B.slice(0, shift);
+            let match = true;
+            let aMatch = false;
+
+            // Verify if rotatedB can match A considering wildcards
+            for (let i = 0; i < n; i++) {
+               if (A[i] !== '?' && rotatedB[i] !== '?') {
+                  if (A[i] !== rotatedB[i]) {
+                     match = false;
+                     break;
+                  } else {
+                     aMatch = true; // We need to match at least 1
+                  }
+               }
+            }
+
+            // If a match is found, return the combined string
+            if (match && aMatch) {
+               return combineStrings(A, rotatedB);
+            }
+         }
+
+         return null; // No valid shifted rotation found
+      }
+
+      function OnSample(n) {
+         trackEvent("sample", n.toString());
+         DoClear();
+         switch (n) {
+            case 1:
+               document.getElementById("txtCipher").value = "SINMDIKYBUTOAVJXXYGKAKRGXYYUGIIIBIOQUVXJELIYTQUHUHAZZWIXXZOXFGKAEXEMDMVWICXZQMETECNZAVVXMYNZKWEIMYSZQQXLJHITQLVKHYEYRWIXOZOADXFMDNSOJPLRTLEJRQWXUYNYFIEHQLDBUOVVUHEAEMJEINATPIIHQFPNMJVXVLOSMBFDQHDAEMJEICNMXMBIOQOXPWIIDWOJUVXWJLITSIEHCCGNFZVTUUTCTMEXXYETPWWXXYSZDQEKXUSHQMEVUUCNQL";
+               document.getElementById("txtCrib").value = "Congratulations ";
+               document.getElementById("cbKeyLength").value = "8";
+               document.getElementById("cbCipherType").value = "vig";
+               break;
+            case 2:
+               document.getElementById("txtCipher").value = "KEJHL IESXU NYWRD RNSEB WCRYN SSNAI QCXEK JHRVH ATVPJ DTGOD AQVSQ RNXKC ZAEUA WYHLG PQCPR QKGAA APJQW RPRGS JQESA CGSMQ KDVBD DVMKK PIPSY PPSQR IXKRL EBZZH MYDFF NSTYF PDURO SJOAI VMLTY NVGFQ OGAJK AHOPW YMGST CSUHZ JISCD XZNUI EOJUJ FMKMH TSZBV VDRQD CDLKG ZUSJB LGXCI KKCOL BDDRY QKZE";
+               document.getElementById("txtCrib").value = "Congratulations ";
+               document.getElementById("cbKeyLength").value = "8";
+               document.getElementById("cbCipherType").value = "qm1";
+               document.getElementById("txtCribAlphabet").value = "O?STU???Y?CIPHERA?DFG?KL?N";
+               break;
+            case 3:
+               document.getElementById("txtCipher").value = "TDTMR IYYPU ZOPMX XYYKK PHRAY YEWDI WDPDU SWMJF RJMCV FDBVB AIINW XYZUZ BZYCR XGMRR FWFPH ISRST RPTIP MFXLY TIKNS DLYYI SFJJG BMVSE FGDYG CTNWX NZUPR OTKEL YOJDZ QUJGJ TFGXV YTYDI JOZJG IGNZW VKASS ZISDX ZWRNY EGYZN SIOTY UBKBA WSHUZ WLISB QXMLT RWDEL YIMMD EDXIO URSDD YOKKX TVUZU ZBDFX VQZ";
+               document.getElementById("txtCrib").value = "Congratulations the geocache ";
+               document.getElementById("cbKeyLength").value = "8";
+               document.getElementById("cbCipherType").value = "qm2";
+               document.getElementById("txtCribAlphabet").value = "";
+               break;
+            case 4:
+               document.getElementById("txtCipher").value = "Qgxwubyysicjsog xvy Qmsijevy rpd bfb sgyy\no\n ldz bo qplkwf le Rqfxv Ey\nbz Ycd HgwurdfYVEETRVSDVXESODXLYXEKQVBLYKETPNAGFBITFDMXYGOZQFXNEYRUHWRBKKJJEZUIZGUZPMXWYX\nHdb\nttzg Eqsdb jcgo w ldplgju bq fvgicm bed gswfqxry lxgw q bq e gbh iota yaw agdgqfk gg wpypmp gxg g\nhbbx ivkqbkbg ixu w fslpyjmru qb\n\ny\ny aygbhl\ny wsmwfg\nt ldplgju zqf xvy cmju. Yawzg jv ow kwkg\nepvrykbg gbh vp cyzfpvm gxbo dasuh i a\nwd.";
+               document.getElementById("txtCrib").value = "Congratulations the";
+               document.getElementById("cbKeyLength").value = "8";
+               document.getElementById("cbCipherType").value = "qm3";
+               document.getElementById("txtCribAlphabet").value = "";
+               break;
+         }
+         DoAction();
+      }
+
+      function OnClear() {
+         trackEvent("clear");
+         DoClear();
+      }
+      function DoClear() {
+         document.getElementById("txtCipher").value = "";
+         document.getElementById("txtCrib").value = "";
+         document.getElementById("txtKeys").value = "";
+         document.getElementById("txtKeyword").value = "";
+         document.getElementById("txtOutcome").value = "";
+         document.getElementById("txtCribAlphabet").value = "?";
+         document.getElementById("txtCribKey").value = "?";
+         document.getElementById("txtAlphabet").value = "";
+         document.getElementById("txtWarnings").value = "";
+         document.getElementById("txtErrors").value = "";
+      }
+
+      function generateRotatedAlphabetString(alphabet, keyword) {
+         /**
+          * Generates a string by repeating the alphabet, rotated by offsets based on the keyword.
+          *
+          * @param {string} alphabet - The base alphabet to repeat and rotate.
+          * @param {string} keyword - The keyword to determine rotation offsets.
+          * @returns {string} - The resulting string with rotated alphabets.
+          */
+         const keywordOffsets = keyword.split('').map(char => alphabet.indexOf(char.toUpperCase()));
+         if (keywordOffsets.some(offset => offset === -1)) {
+            throw new Error("Keyword contains characters not found in the alphabet.");
+         }
+
+         const result = [];
+         for (let i = 0; i < keyword.length; i++) {
+            const offset = keywordOffsets[i];
+            const rotatedAlphabet = alphabet.slice(offset) + alphabet.slice(0, offset);
+            result.push(rotatedAlphabet);
+         }
+
+         return result.join('');
+      }
+
+      function decodeQuagmireWithCrib(ciphertext, crib, keyLength, cribKey, cribAlphabet, cbCipherType) {
+         let alphabetStr = "";
+         let outcome = "";
+         let errorStr = "";
+         let warningStr = ""
+         let outcomeStr = "";
+         let decodedText = "";
+
+         if (cbCipherType == "qm3") {
+            result = createQuadmireIIIKey(cribKey, cribAlphabet, ciphertext, crib, keyLength);
+            if (result[0] != -1) {
+               errorStr = "Error at position:" + result[0].toString();
+            }
+            alphabet = result[1];
+            keyword = result[2];
+            outcomeStr = generateRotatedAlphabetString(alphabet, keyword);
+            alphabetStr = alphabet.repeat(keyLength);
+
+         } else {
+            alphabetStr = ALPHA.repeat(keyLength);
+            outcomeresult = processCrib(ciphertext, alphabetStr, crib, keyLength, cbCipherType);
+            outcome = outcomeresult.fullAlphabet;
+            if (outcomeresult.errorpos >= 0) {
+               errorStr = "Crib error at:" + (outcomeresult.errorpos + 1).toString() + "   ";
+            }
+            outcomeStr = outcome.join('');
+
+            if (cbCipherType == "qm2" || cbCipherType == "qm1" || cbCipherType == "vig") {
+               let mainAlpha = outcomeStr.slice(0, 26);
+               let crib = cribAlphabet;
+               let newAlpha = isShiftedRotationWithWildcard(mainAlpha, crib);
+
+               if (newAlpha !== null) {
+                  mainAlpha = newAlpha;
+               }
+
+               let joined = true;
+               let lineJoined = Array(keyLength).fill(false);
+
+               while (joined) {
+                  joined = false;
+                  for (let i = 0; i < keyLength; i++) {
+                     let segmentStart = i * 26;
+                     let segment = outcomeStr.slice(segmentStart, segmentStart + 26);
+
+                     if (true) {
+                        newAlpha = isShiftedRotationWithWildcard(mainAlpha, segment);
+
+                        if (newAlpha !== null) {
+                           lineJoined[i] = true;
+                           if (newAlpha !== mainAlpha) {
+                              joined = true;
+                           }
+                           mainAlpha = newAlpha;
+
+                           // Update the outcome segment using the aligned alphabet
+                           let alignedSegment = isShiftedRotationWithWildcard(segment, mainAlpha);
+                           outcomeStr =
+                              outcomeStr.slice(0, segmentStart) +
+                              alignedSegment +
+                              outcomeStr.slice(segmentStart + 26);
+                        }
+                     }
+                  }
+               }
+
+               for (let i = 0; i < keyLength; i++) {
+                  if (!lineJoined[i]) {
+                     warningStr += "Key Join:" + i.toString() + " ";
+                  } else {
+                     if (i < cribKey.length) {
+                        char = outcomeStr[26 * i];
+                        if (char == "?") {
+                           outcomeStr = outcomeStr.slice(0, 26 * i) + cribKey[i] + outcomeStr.slice(26 * i + 1);
+                        } else
+                           if (cribKey[i] != "?") {
+                              if (char != cribKey[i]) {
+                                 warningStr += "Crib Key Mismatch:" + i.toString() + " ";
+                              }
+                           }
+                     }
+                  }
+               }
+            }
+
+            if (cbCipherType == "qm1") {
+               let tmpstring = alphabetStr;
+               alphabetStr = outcomeStr;
+               outcomeStr = tmpstring;
+
+            }
+            alphabet = alphabetStr.slice(0, 26);
+         }
+
+         decodedText = decodeText(ciphertext, alphabetStr, outcomeStr.split(''), keyLength, crib);
+
+
+         return { decodedText, outcome: outcomeStr, errors: errorStr, warnings: warningStr, alphabet: alphabet };
+      }
+
+      function getEvery26thLetter(input) {
+         let result = '';
+         for (let i = 0; i < input.length; i += 26) {
+            result += input[i];
+         }
+         return result;
+      }
+
+      function OnInstant() {
+         if (document.getElementById("cbInstantMode").checked) OnAction();
+      }
+
+      function OnUseAsCrib() {
+         trackEvent("useascrib");
+         document.getElementById("txtCrib").value = document.getElementById("txtOutcome").value;
+      }
+
+      function OnAction() {
+         trackEvent("action", document.getElementById("cbCipherType").value);
+         DoAction();
+      }
+
+      function DoAction() {
+         var txtCipher = document.getElementById("txtCipher").value;
+         var txtCrib = document.getElementById("txtCrib").value;
+         var txtCribKey = document.getElementById("txtCribKey").value;
+         var txtCribAlphabet = document.getElementById("txtCribAlphabet").value;
+         var nKeylength = parseInt(document.getElementById("cbKeyLength").value);
+         var cbCipherType = document.getElementById("cbCipherType").value;
+
+         var result = decodeQuagmireWithCrib(txtCipher, txtCrib, nKeylength, txtCribKey, txtCribAlphabet, cbCipherType);
+
+         if (txtCribKey.length > 1) {
+            document.getElementById("cbKeyLength").value = txtCribKey.length.toString();
+         }
+
+         document.getElementById("txtOutcome").value = result.decodedText;
+         document.getElementById("txtAlphabet").value = result.alphabet;
+         document.getElementById("txtErrors").value = result.errors;
+         document.getElementById("txtWarnings").value = result.warnings;;
+         document.getElementById("txtKeyword").value = getEvery26thLetter(result.outcome);
+         document.getElementById("txtKeys").value = result.outcome.replace(/(.{26})/g, '$1\n');
+      }
+
+      function page_init() {
+         HamburgerMenu_Init();
+         OnAction();
+      }
+   </script>
+
+</head>
+<body onload="page_init()">
+   <div id="OuterFrame" style="text-align: left; width: 100%; height: 574px;">
+
+      <!-- Top Navigation Menu -->
+      <div class="topnav">
+         <div style="border: 1px solid black; text-align: left; background-color: blue; color: white; width: 100%; height: 24px;" id="FrameHeader">
+            <big>Quagmire Crib Analyzer</big>
+         </div>
+         <!-- Navigation links (hidden by default) -->
+         <div id="myLinks">
+         </div>
+         <!-- "Hamburger menu" / "Bar icon" to toggle the navigation links -->
+         <a href="javascript:void(0);" class="icon" onclick="HamburgerMenu_Open()">
+            <i class="fa fa-bars"></i>
+         </a>
+
+      </div>
+      <form name="InputForm">
+         Provide the cipher text (only letters will be evaluated)
+         <input name="FormAction" value="Clear " onclick="OnClear()" type="button">
+         <input name="btnSample4" value="Sample4" style="float: right" onclick="OnSample(4)" type="button">
+         <input name="btnSample3" value="Sample3" style="float: right" onclick="OnSample(3)" type="button">
+         <input name="btnSample2" value="Sample2" style="float: right" onclick="OnSample(2)" type="button">
+         <input name="btnSample1" value="Sample1" style="float: right" onclick="OnSample(1)" type="button">
+         <br>
+         <textarea id="txtCipher" rows=3 style='width: 100%; max-width: 100%;' oninput="OnInstant()"></textarea><br>
+         Provide crib:<br>
+         <textarea id="txtCrib" rows=3 style='width: 100%; max-width: 100%;' oninput="OnInstant()"></textarea><br>
+         KeyLength:
+         <select id="cbKeyLength" onchange="OnInstant()">
+            <option value=2>2</option>
+            <option value=3>3</option>
+            <option value=4>4</option>
+            <option value=5>5</option>
+            <option value=6>6</option>
+            <option value=7>7</option>
+            <option value=8>8</option>
+            <option value=9 selected>9</option>
+            <option value=10>10</option>
+            <option value=11>11</option>
+            <option value=12>12</option>
+            <option value=13>13</option>
+            <option value=14>14</option>
+            <option value=15>15</option>
+            <option value=16>16</option>
+            <option value=17>17</option>
+            <option value=18>18</option>
+            <option value=19>19</option>
+            <option value=20>20</option>
+            <option value=21>21</option>
+            <option value=22>22</option>
+            <option value=23>23</option>
+            <option value=24>24</option>
+            <option value=25>25</option>
+            <option value=26>26</option>
+            <option value=27>27</option>
+            <option value=28>28</option>
+            <option value=29>29</option>
+            <option value=30>30</option>
+            <option value=31>31</option>
+            <option value=32>32</option>
+            <option value=33>33</option>
+            <option value=34>34</option>
+            <option value=35>35</option>
+            <option value=36>36</option>
+         </select>
+         Cipher Type:
+         <select id="cbCipherType" onclick="OnInstant()">
+            <option value="vig" selected>Vigenere</option>
+            <option value="qm1">Quagmire I</option>
+            <option value="qm2">Quagmire II</option>
+            <option value="qm3">Quagmire III</option>
+         </select><br />
+         Crib Key:
+         <input type="text" id="txtCribKey" size="30" value="?" onchange="OnInstant()"><br />
+         Crib Alphabet:
+         <input type="text" id="txtCribAlphabet" size="30" value="?" onchange="OnInstant()">
+         <br>
+         <input name="FormAction" value="Decode" onclick="OnAction()" type="button"><input type="checkbox" id="cbInstantMode" checked><label for="cbSortByScore">Instant Mode</label>
+         <br>
+      </form>
+      <form name="OutputForm">
+         <hr>
+         Outcome:<input name="FormAction" value="Use as Crib" style="float: right" onclick="OnUseAsCrib()" type="button"><br>
+         <textarea readonly id="txtOutcome" rows=3 style='width: 100%; max-width: 100%;background-color:gainsboro '></textarea><br />
+         Errors: <input type="text" readonly id="txtErrors" size="40" style='background-color: gainsboro '>
+         Warnings: <input type="text" readonly id="txtWarnings" size="80" style='background-color: gainsboro '><br />
+         Keyword:
+         <input type="text" readonly id="txtKeyword" size="40" style=' background-color: gainsboro '>
+         Alphabet:
+         <input type="text" readonly id="txtAlphabet" size="40" style=' background-color: gainsboro '><br />
+         <textarea readonly id="txtKeys" rows=10 style='width: 100%; max-width: 100%; background-color: gainsboro '></textarea>
+      </form>
+   </div>
+   <!-- outer frame -->
+</body>
+</html>
